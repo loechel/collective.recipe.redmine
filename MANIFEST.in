@@ -1,0 +1,5 @@
+include *
+recursive-include src *
+recursive-include docs *
+include LICENSE
+global-exclude *.pyc *.pyo
