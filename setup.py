@@ -6,9 +6,10 @@ from pkg_resources import get_distribution, DistributionNotFound
 import os
 
 __version__ = '0.0.1'
+__name__ = 'collective.recipe.redmine'
 
 setup(
-    name='collective.recipe.redmine',
+    name=__name__,
     version=__version__,
     url='https://github.com/loechel/collective.recipe.redmine',
     license='Apache Software License v2',
@@ -25,7 +26,13 @@ setup(
     install_requires=[
         'setuptools',
         # -*- Extra requirements: -*-
-        'python-redmine',
+        'Genshi',
+        'zc.buildout',
+        'svn',
+
+        'ipython',
+        'ipdb',
+
     ],
     zip_safe=False,
     classifiers=[
@@ -44,7 +51,10 @@ setup(
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
     ],
-    entry_points="""
-    # -*- Entry points: -*-
-    """,
+    entry_points = {
+        "zc.buildout": [
+            "default = collective.recipe.redmine:SolrSingleRecipe",
+            "mc = collective.recipe.redmine:MultiCoreRecipe",
+        ]
+    },
     )
