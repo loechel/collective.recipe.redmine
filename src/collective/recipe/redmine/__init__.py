@@ -134,8 +134,11 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         system('mkdir -p {path}'.format(path=self.options['location']))
         system('cd {path}'.format(path=self.options['location']))
 
-        os.environ['GEM_HOME'] = self.options['location']+'/vruby'
-        os.environ['PATH'] = os.environ['GEM_HOME']+'/bin:'+self.options['ruby']+':'+os.environ['PATH']
+        if self.options['virtual-ruby']:
+            os.environ['GEM_HOME'] = self.options['location']+'/vruby'
+            os.environ['PATH'] = os.environ['GEM_HOME']+'/bin:'+self.options['ruby']+':'+os.environ['PATH']
+        else:
+            os.environ['PATH'] = self.options['ruby']+':'+os.environ['PATH']
         os.environ['RAILS_ENV'] = self.options['rails_env']
         os.environ['REDMINE_LANG'] = 'en'
 
@@ -290,12 +293,19 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                 ainstance['location'] = instance_path
                 instance_list.append(ainstance)
 
+
+        passenger_ruby = ''
+        if self.options['virtual-ruby']:
+            passenger_ruby = self.options['location']+'/vruby/bin/ruby'
+        else:
+            self.options['ruby'] 
+
         self.generate_apache_file(            
                     source=('%s/apache_vhost.tmpl' % TEMPLATE_DIR),                    
                     destination=os.path.abspath(self.buildout['buildout']['directory']),
                     mc = True,
                     instances = instance_list,
-                    ruby = self.options['ruby']
+                    ruby = passenger_ruby 
                     )
 
         return self.options['location'] 
