@@ -1,0 +1,88 @@
+
+
+<VirtualHost *:80>
+    ServerName scm.verwaltung.uni-muenchen.de
+    ServerAdmin edv.internet@verwaltung.uni-muenchen.de
+
+	RewriteEngine on
+	 
+	RewriteCond %{HTTPS} !=on
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+</VirtualHost>
+
+
+<IfDefine SSL>
+<IfDefine !NOSSL>
+
+<VirtualHost *:443>
+
+    PassengerRuby ${options.ruby}
+
+    #  General setup for the virtual host
+    DocumentRoot "/srv/www/htdocs"
+    #ServerName scm.verwaltung.uni-muenchen.de:443
+    #ServerAdmin edv.internet@verwaltung.uni-muenchen.de
+    ErrorLog /var/log/apache2/error_log
+    TransferLog /var/log/apache2/access_log
+
+    #   SSL Engine Switch:
+    #   Enable/Disable SSL for this virtual host.
+    SSLEngine on
+
+    # 4 possible values: All, SSLv2, SSLv3, TLSv1. Allow TLS only:
+    SSLProtocol all -SSLv2 -SSLv3
+
+
+    SSLCipherSuite ALL:!aNULL:!eNULL:!SSLv2:!LOW:!EXP:!MD5:@STRENGTH
+
+    #SSLCertificateFile /etc/apache2/ssl.crt/server.crt
+    SSLCertificateFile /etc/apache2/ssl.crt/redmine-test.verwaltung.uni-muenchen.pem
+
+    #SSLCertificateKeyFile /etc/apache2/ssl.key/server.key
+    SSLCertificateKeyFile /etc/apache2/ssl.key/redmine-test.verwaltung.uni-muenchen.de_key.pem
+    SSLCertificateChainFile /etc/apache2/ssl.crt/lmu-chain.pem
+
+    <Files ~ "\.(cgi|shtml|phtml|php3?)$">
+        SSLOptions +StdEnvVars
+    </Files>
+    <Directory "/srv/www/cgi-bin">
+        SSLOptions +StdEnvVars
+    </Directory>
+
+    {% if options.mc %}
+    {% for instance in options.instances %}
+    Alias ${instance.suburi} ${instance.location}/public
+    <Location ${instance.suburi}>
+        PassengerBaseURI ${instance.suburi}
+        PassengerAppRoot ${instance.location}
+    </Location>
+    <Directory ${instance.location}/public>
+  		Order allow,deny
+        Allow from all
+        Options -MultiViews
+  		# This relaxes Apache security settings.
+  		AllowOverride all
+        # Uncomment this if you're on Apache >= 2.4:
+        #Require all granted
+    </Directory>
+    
+ 	{% end %}
+ 	{% if not options.mc %}
+ 	DocumentRoot ${}/public
+	<Directory /srv/www/redmine-2.4/public>
+  		Order allow,deny
+  		Allow from all
+  		# This relaxes Apache security settings.
+  		AllowOverride all
+  		# MultiViews must be turned off.
+  		Options -MultiViews
+ 	</Directory>
+ 	{% end %}
+
+    CustomLog /var/log/apache2/ssl_request_log   ssl_combined
+
+</VirtualHost>
+
+</IfDefine>
+</IfDefine>
+

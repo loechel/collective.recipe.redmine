@@ -1,0 +1,32 @@
+# database settings for redmine
+
+{% if 'production' in options.db_config.keys() %}\
+production:
+  adapter: ${options.db_config['production']['adapter']}
+  database: ${options.db_config['production']['database']}
+  host: ${options.db_config['production']['host']}
+  port: ${options.db_config['production']['port']}
+  username: ${options.db_config['production']['username']}
+  password: ${options.db_config['production']['password']}
+  encoding: ${options.db_config['production']['encoding']}
+{% end %}
+{% if 'development' in options.db_config.keys() %}\
+development:
+  adapter: ${options.db_config['development']['adapter']}
+  database: ${options.db_config['development']['database']}
+  host: ${options.db_config['development']['host']}
+  port: ${options.db_config['development']['port']}
+  username: ${options.db_config['development']['username']}
+  password: ${options.db_config['development']['password']}
+  encoding: ${options.db_config['development']['encoding']}
+{% end %}
+{% if 'test' in options.db_config.keys() %}\
+test:
+  adapter: ${options.db_config['test']['adapter']}
+  database: ${options.db_config['test']['database']}
+  host: ${options.db_config['test']['host']}
+  port: ${options.db_config['test']['port']}
+  username: ${options.db_config['test']['username']}
+  password: ${options.db_config['test']['password']}
+  encoding: ${options.db_config['test']['encoding']}
+{% end %}
