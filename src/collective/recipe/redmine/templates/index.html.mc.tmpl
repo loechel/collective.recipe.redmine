@@ -6,7 +6,9 @@
 	<body>
 		<h1></h1>
 		<ul>
-			<li><a href="/redmine">Redmine</a></li>
+			{% for instance in options.instances %}
+			<li><a href="${instance.suburi}">${instance.suburi}</a></li>
+			{% end %}
 		</ul>
 	</body>
 </html>

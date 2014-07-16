@@ -6,6 +6,9 @@ from genshi.template.eval import UndefinedError
 
 from datetime import datetime
 
+from zc.buildout.easy_install import scripts as create_script
+from zc.buildout import UserError
+
 import glob
 import logging
 import os
@@ -28,13 +31,13 @@ class _RedmineBaseRecipe(object):
     def __init__(self, buildout, name, options_orig):
 
         self.buildout, self.name, self.options = buildout, name, options_orig
-        #server instance opts
-        self.options = {}
+
+        #self.options = {}
 
         self.options['redmine_version'] = options_orig.get('redmine_version', '2.5-stable').strip()
-        self.options['virtual-ruby'] = bool(options_orig.get('virtual-ruby', False))
+        self.options['virtual-ruby'] = options_orig.get('virtual-ruby', False)
         self.options['rails_env'] = options_orig.get('rails_env', 'production').strip()
-        self.options['without'] = options_orig.get('build_without', 'development test').strip().split()
+        self.options['without'] = options_orig.get('build_without', 'development test').strip()
         self.options['ruby'] = options_orig.get('ruby', '').strip()
 
         location = options_orig.get(
@@ -87,7 +90,10 @@ class _RedmineBaseRecipe(object):
 
     def generate_apache_file(self, source, destination, **kwargs):
         self._generate_from_template(source=source, destination=destination,
-                                     name='redmine.conf', **kwargs)
+                                     name='redmine_include.conf', **kwargs)
+    def generate_index_file(self, source, destination, **kwargs):
+        self._generate_from_template(source=source, destination=destination,
+                                     name='index.html', **kwargs)
     def generate_database_file(self, source, destination, **kwargs):
         self._generate_from_template(source=source, destination=destination,
                                      name='database.yml', **kwargs)
@@ -102,7 +108,6 @@ class SingleCoreRecipe(_RedmineBaseRecipe):
     def install(self):
         logger = logging.getLogger(self.name)
         pass
-
 
     def update(self):
         """
@@ -122,11 +127,6 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
     def __init__(self, buildout, name, options):
         super(MultiCoreRecipe, self).__init__(buildout, name, options)
-        self.options['instances'] = options.get('instances', '').splitlines()
-
-
-
-
 
     def install(self):
         logger = logging.getLogger(self.name)
@@ -135,12 +135,23 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         system('cd {path}'.format(path=self.options['location']))
 
         if self.options['virtual-ruby']:
-            os.environ['GEM_HOME'] = self.options['location']+'/vruby'
+            os.environ['GEM_HOME'] = os.path.join(self.options['location'],'vruby')
+            os.environ['GEM_PATH'] = os.path.join(self.options['location'],'vruby','gems')
             os.environ['PATH'] = os.environ['GEM_HOME']+'/bin:'+self.options['ruby']+':'+os.environ['PATH']
         else:
-            os.environ['PATH'] = self.options['ruby']+':'+os.environ['PATH']
+            os.environ['GEM_HOME'] = os.path.join(self.buildout['buildout']['directory'], 'parts', 'ruby')
+            os.environ['GEM_PATH'] = os.path.join(self.buildout['buildout']['directory'], 'parts', 'ruby', 'gems')
+            #os.environ['PATH'] = self.options['ruby']+':'+os.environ['PATH']
+            os.environ['PATH'] = os.environ['GEM_HOME']+'/bin:'+self.options['ruby']+':'+os.environ['PATH']
         os.environ['RAILS_ENV'] = self.options['rails_env']
         os.environ['REDMINE_LANG'] = 'en'
+
+        gems = self.options.get('gems', '').split()
+        if gems:
+            bin_dir = os.path.abspath(self.options['ruby'])
+
+            logger.info('Install Ruby Gems: {gems}'.format(gems=' '.join(gems)))
+            subprocess.call(['gem', 'install']+gems, cwd=self.options['location'], env=os.environ)
 
         system('svn co http://svn.redmine.org/redmine/branches/{version} {path}'.format(version=self.options['redmine_version'], path=self.options['location']))
 
@@ -148,7 +159,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
         instance_list = []
 
-        for instance in self.options['instances']:
+        for instance in self.options['instances'].split():
             if instance:
                 instance_path = os.path.join(self.buildout['buildout']['parts-directory'], 'redmine-'+instance)
                 buildout_var_path=self.buildout['buildout']['directory']+'/var'
@@ -219,6 +230,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                     )
 
 
+
                 # Test if db alread loaded
                 data_db_flag_file = os.path.join(buildout_var_path, instance, 'db_flag_file')
                 if not os.path.exists(data_db_flag_file):
@@ -256,7 +268,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                 else:
                     # if DB exists: just rebuild and run migrate to update DB
 
-                    subprocess.call(['bundle', 'install', '--without']+self.options['without'], cwd=instance_path, env=os.environ)
+                    subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
                     subprocess.call(['rake', 'generate_secret_token'], cwd=instance_path, env=os.environ)
                     subprocess.call(['rake', 'db:migrate'], cwd=instance_path, env=os.environ)
 
@@ -274,7 +286,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                 for theme in os.listdir(theme_source_path):
                     os.symlink(os.path.abspath(os.path.join(theme_source_path, theme)), os.path.join(theme_path, theme))
 
-                subprocess.call(['bundle', 'install', '--without']+self.options['without'], cwd=instance_path, env=os.environ)
+                subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
                 subprocess.call(['rake', 'db:migrate'], cwd=instance_path, env=os.environ)
 
                 subprocess.call(['rake', 'redmine:plugins'], cwd=instance_path, env=os.environ)
@@ -291,21 +303,24 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                 ainstance = {}
                 ainstance['suburi'] = self.buildout[instance].get('redmine_suburi')
                 ainstance['location'] = instance_path
+                ainstance['gem_home'] = os.environ['GEM_HOME']
+                ainstance['gem_path'] = os.environ['GEM_PATH']
                 instance_list.append(ainstance)
 
 
-        passenger_ruby = ''
-        if self.options['virtual-ruby']:
-            passenger_ruby = self.options['location']+'/vruby/bin/ruby'
-        else:
-            self.options['ruby'] 
+        passenger_ruby = self.options['ruby']+'/ruby'
 
         self.generate_apache_file(            
-                    source=('%s/apache_vhost.tmpl' % TEMPLATE_DIR),                    
+                    source=('%s/apache_include.tmpl' % TEMPLATE_DIR),                    
                     destination=os.path.abspath(self.buildout['buildout']['directory']),
                     mc = True,
                     instances = instance_list,
                     ruby = passenger_ruby 
+                    )
+        self.generate_index_file(            
+                    source=('%s/index.html.mc.tmpl' % TEMPLATE_DIR),
+                    destination=os.path.abspath(self.buildout['buildout']['directory']),
+                    instances = instance_list,
                     )
 
         return self.options['location'] 
@@ -320,7 +335,8 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         recreate it with a buildout update. We do this
         often while testing our application.
         """
-        if os.path.exists(self.install_dir):
-            pass
-        else:
-            self.install()
+        self.install()
+        #if os.path.exists(self.install_dir):
+        #    pass
+        #else:
+        #    self.install()
