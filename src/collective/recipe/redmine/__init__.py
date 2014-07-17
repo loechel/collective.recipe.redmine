@@ -192,35 +192,43 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                 # write database file
                 redmine_db_config = {}
                 if self.buildout[instance].get('redmine_production_db'):
+
                     redmine_db_config['production'] = {
                         'adapter'  : self.buildout[instance].get('redmine_production_db_adapter','postgresql'), #mysql2)
                         'database' : self.buildout[instance].get('redmine_production_db_database', 'redmine-'+instance),
                         'host'     : self.buildout[instance].get('redmine_production_db_host','localhost'),
-                        'port'     : self.buildout[instance].get('redmine_production_db_port','5432'), # '3306'
                         'username' : self.buildout[instance].get('redmine_production_db_username','redmine'),
                         'password' : self.buildout[instance].get('redmine_production_db_password','redmine'),
                         'encoding' : self.buildout[instance].get('redmine_production_db_encoding','utf8'),
                         }
+
+                    port = self.buildout[instance].get('redmine_production_db_port', ''), # '3306','5432'
+                    if port:
+                        redmine_db_config['production']['port'] = port
                 if self.buildout[instance].get('redmine_development_db'):
                     redmine_db_config['development'] = {
                         'adapter'  : self.buildout[instance].get('redmine_development_db_adapter','postgresql'), #mysql2)
                         'database' : self.buildout[instance].get('redmine_development_db_database', 'redmine-'+instance),
                         'host'     : self.buildout[instance].get('redmine_development_db_host','localhost'),
-                        'port'     : self.buildout[instance].get('redmine_development_db_port','5432'), # '3306'
                         'username' : self.buildout[instance].get('redmine_development_db_username','redmine'),
                         'password' : self.buildout[instance].get('redmine_development_db_password','redmine'),
                         'encoding' : self.buildout[instance].get('redmine_development_db_encoding','utf8'),
                         }
+                    port = self.buildout[instance].get('redmine_development_db_port'), # '3306','5432'
+                    if port:
+                        redmine_db_config['development']['port'] = port
                 if self.buildout[instance].get('redmine_test_db'):
                     redmine_db_config['test'] = {
                         'adapter'  : self.buildout[instance].get('redmine_test_db_adapter','postgresql'), #mysql2)
                         'database' : self.buildout[instance].get('redmine_test_db_database', 'redmine-'+instance),
                         'host'     : self.buildout[instance].get('redmine_test_db_host','localhost'),
-                        'port'     : self.buildout[instance].get('redmine_test_db_port','5432'), # '3306'
                         'username' : self.buildout[instance].get('redmine_test_db_username','redmine'),
                         'password' : self.buildout[instance].get('redmine_test_db_password','redmine'),
                         'encoding' : self.buildout[instance].get('redmine_test_db_encoding','utf8'),
                         }
+                    port = self.buildout[instance].get('redmine_test_db_port'), # '3306','5432'
+                    if port:
+                        redmine_db_config['test']['port'] = port
 
 
                 self.generate_database_file(            
@@ -238,15 +246,20 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                     
                     for db in redmine_db_config.keys():
                         if redmine_db_config[db]['adapter'] == 'postgresql':
-                            subprocess.call([
+                            command = [
                                 'createdb', redmine_db_config[db]['database'],  
                                 '-h', redmine_db_config[db]['host'], 
-                                '-p', redmine_db_config[db]['port'], 
                                 '-U', redmine_db_config[db]['username'], 
                                 '-W', 
                                 '-O', redmine_db_config[db]['username'], 
                                 '-E', redmine_db_config[db]['encoding']
-                                ])
+                                ]
+                            #if redmine_db_config[db]['port']:
+                            #    command.append('-p')
+                            #    command.append(redmine_db_config[db]['port'])
+
+                            #import ipdb; ipdb.set_trace()
+                            subprocess.call(command)
                         elif redmine_db_config[db]['adapter'] == 'mysql2':
                             subprocess.call([
                                 'mysql', 
@@ -258,7 +271,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                             self.logger.warn('unknown database adapter')
 
 
-                    subprocess.call(['bundle', 'install', '--without']+self.options['without'], cwd=instance_path, env=os.environ)
+                    subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
                     subprocess.call(['rake', 'generate_secret_token'], cwd=instance_path, env=os.environ)
 
                     subprocess.call(['rake', 'db:migrate'], cwd=instance_path, env=os.environ)

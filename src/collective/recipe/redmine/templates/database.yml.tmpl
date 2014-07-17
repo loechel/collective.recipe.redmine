@@ -3,9 +3,8 @@
 {% if 'production' in options.db_config.keys() %}\
 production:
   adapter: ${options.db_config['production']['adapter']}
-  database: ${options.db_config['production']['database']}
+  database: "${options.db_config['production']['database']}"
   host: ${options.db_config['production']['host']}
-  port: ${options.db_config['production']['port']}
   username: ${options.db_config['production']['username']}
   password: ${options.db_config['production']['password']}
   encoding: ${options.db_config['production']['encoding']}
@@ -15,7 +14,9 @@ development:
   adapter: ${options.db_config['development']['adapter']}
   database: ${options.db_config['development']['database']}
   host: ${options.db_config['development']['host']}
+  {% if options.db_config['development']['port'] %}
   port: ${options.db_config['development']['port']}
+  {% end %}
   username: ${options.db_config['development']['username']}
   password: ${options.db_config['development']['password']}
   encoding: ${options.db_config['development']['encoding']}
@@ -25,7 +26,9 @@ test:
   adapter: ${options.db_config['test']['adapter']}
   database: ${options.db_config['test']['database']}
   host: ${options.db_config['test']['host']}
+  {% if options.db_config['test']['port'] %}
   port: ${options.db_config['test']['port']}
+  {% end %}
   username: ${options.db_config['test']['username']}
   password: ${options.db_config['test']['password']}
   encoding: ${options.db_config['test']['encoding']}
