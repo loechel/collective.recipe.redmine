@@ -191,7 +191,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
                 # write database file
                 redmine_db_config = {}
-                if self.buildout[instance].get('redmine_production_db'):
+                if self.buildout[instance].get('redmine_production_db', True):
 
                     redmine_db_config['production'] = {
                         'adapter'  : self.buildout[instance].get('redmine_production_db_adapter','postgresql'), #mysql2)
@@ -205,7 +205,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                     port = self.buildout[instance].get('redmine_production_db_port', ''), # '3306','5432'
                     if port:
                         redmine_db_config['production']['port'] = port
-                if self.buildout[instance].get('redmine_development_db'):
+                if self.buildout[instance].get('redmine_development_db', False):
                     redmine_db_config['development'] = {
                         'adapter'  : self.buildout[instance].get('redmine_development_db_adapter','postgresql'), #mysql2)
                         'database' : self.buildout[instance].get('redmine_development_db_database', 'redmine-'+instance),
@@ -217,7 +217,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                     port = self.buildout[instance].get('redmine_development_db_port'), # '3306','5432'
                     if port:
                         redmine_db_config['development']['port'] = port
-                if self.buildout[instance].get('redmine_test_db'):
+                if self.buildout[instance].get('redmine_test_db', False):
                     redmine_db_config['test'] = {
                         'adapter'  : self.buildout[instance].get('redmine_test_db_adapter','postgresql'), #mysql2)
                         'database' : self.buildout[instance].get('redmine_test_db_database', 'redmine-'+instance),
@@ -314,7 +314,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
 
                 ainstance = {}
-                ainstance['suburi'] = self.buildout[instance].get('redmine_suburi')
+                ainstance['suburi'] = self.buildout[instance].get('redmine_suburi', '/'+instance)
                 ainstance['location'] = instance_path
                 ainstance['gem_home'] = os.environ['GEM_HOME']
                 ainstance['gem_path'] = os.environ['GEM_PATH']

@@ -8,28 +8,31 @@ production:
   username: ${options.db_config['production']['username']}
   password: ${options.db_config['production']['password']}
   encoding: ${options.db_config['production']['encoding']}
+{% if options.db_config['production']['port'] != '' %}\
+  port: ${options.db_config['production']['port']}
+{% end %}\
 {% end %}
 {% if 'development' in options.db_config.keys() %}\
 development:
   adapter: ${options.db_config['development']['adapter']}
   database: ${options.db_config['development']['database']}
-  host: ${options.db_config['development']['host']}
-  {% if options.db_config['development']['port'] %}
-  port: ${options.db_config['development']['port']}
-  {% end %}
   username: ${options.db_config['development']['username']}
   password: ${options.db_config['development']['password']}
   encoding: ${options.db_config['development']['encoding']}
+  host: ${options.db_config['development']['host']}
+{% if options.db_config['development']['port'] != '' %}\
+  port: ${options.db_config['development']['port']}
+{% end %}
 {% end %}
 {% if 'test' in options.db_config.keys() %}\
 test:
   adapter: ${options.db_config['test']['adapter']}
   database: ${options.db_config['test']['database']}
-  host: ${options.db_config['test']['host']}
-  {% if options.db_config['test']['port'] %}
-  port: ${options.db_config['test']['port']}
-  {% end %}
   username: ${options.db_config['test']['username']}
   password: ${options.db_config['test']['password']}
   encoding: ${options.db_config['test']['encoding']}
+  host: ${options.db_config['test']['host']}
+{% if options.db_config['test']['port'] != '' %}\
+  port: ${options.db_config['test']['port']}
+{% end %}
 {% end %}
