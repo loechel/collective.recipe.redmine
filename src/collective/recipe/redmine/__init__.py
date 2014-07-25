@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 from genshi.template import Context, NewTextTemplate
 from genshi.template.base import TemplateSyntaxError
@@ -15,6 +16,7 @@ import os
 import shutil
 import sys
 import subprocess
+import fileinput
 
 import pkg_resources
 import zc.buildout
@@ -31,7 +33,7 @@ class _RedmineBaseRecipe(object):
     def __init__(self, buildout, name, options_orig):
 
         self.buildout, self.name, self.options = buildout, name, options_orig
-
+        self.logger = logging.getLogger(self.name)
         #self.options = {}
 
         self.options['redmine_version'] = options_orig.get('redmine_version', '2.5-stable').strip()
@@ -130,9 +132,10 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
     def install(self):
         logger = logging.getLogger(self.name)
+        if os.path.exists(self.options['location']):
+            subprocess.call(['rm', '-rf', self.options['location']])
 
-        system('mkdir -p {path}'.format(path=self.options['location']))
-        system('cd {path}'.format(path=self.options['location']))
+        subprocess.call(['mkdir', '-p', self.options['location']])
 
         if self.options['virtual-ruby']:
             os.environ['GEM_HOME'] = os.path.join(self.options['location'],'vruby')
@@ -149,11 +152,17 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         gems = self.options.get('gems', '').split()
         if gems:
             bin_dir = os.path.abspath(self.options['ruby'])
+            self._install_gems(gems, bin_dir)
+            #logger.info('Install Ruby Gems: {gems}'.format(gems=' '.join(gems)))
+            #subprocess.call(['gem', 'install']+gems, cwd=self.options['location'], env=os.environ)
+        try:
+            system('svn co https://svn.redmine.org/redmine/branches/{version} {path}'.format(version=self.options['redmine_version'], path=self.options['location']))
+        except:
+            subprocess.call(['rm', '-rf', self.options['location']])
 
-            logger.info('Install Ruby Gems: {gems}'.format(gems=' '.join(gems)))
-            subprocess.call(['gem', 'install']+gems, cwd=self.options['location'], env=os.environ)
-
-        system('svn co http://svn.redmine.org/redmine/branches/{version} {path}'.format(version=self.options['redmine_version'], path=self.options['location']))
+            subprocess.call(['mkdir', '-p', self.options['location']])
+            subprocess.call(['git', 'clone', 'https://github.com/redmine/redmine.git' , self.options['location']], cwd=self.options['location'], env=os.environ)
+            subprocess.call(['git', 'checkout', self.options['redmine_version']], cwd=self.options['location'], env=os.environ)
 
         buildout_var_path=os.path.join(self.buildout['buildout']['directory'], 'var')
 
@@ -185,7 +194,8 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                     instance_path=instance_path
                     ))
 
-                subprocess.call(['gem', 'install', 'bundler'], cwd=instance_path, env=os.environ)
+                #subprocess.call(['gem', 'install', 'bundler'], cwd=instance_path, env=os.environ)
+                self._install_gems(['bundler'], instance_path)
                 subprocess.call(['mkdir', '-p', 'tmp', 'tmp/pdf', 'public/public_assets'], cwd=instance_path, env=os.environ)
                 subprocess.call(['chmod', '-R', '0755', 'files', 'log', 'tmp', 'public/public_assets'], cwd=instance_path, env=os.environ)
 
@@ -271,7 +281,8 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                             self.logger.warn('unknown database adapter')
 
 
-                    subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
+                    #subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
+                    self._bundle_install(instance_path)
                     subprocess.call(['rake', 'generate_secret_token'], cwd=instance_path, env=os.environ)
 
                     subprocess.call(['rake', 'db:migrate'], cwd=instance_path, env=os.environ)
@@ -281,7 +292,8 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                 else:
                     # if DB exists: just rebuild and run migrate to update DB
 
-                    subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
+                    #subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
+                    self._bundle_install(instance_path)
                     subprocess.call(['rake', 'generate_secret_token'], cwd=instance_path, env=os.environ)
                     subprocess.call(['rake', 'db:migrate'], cwd=instance_path, env=os.environ)
 
@@ -298,8 +310,9 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
                 for theme in os.listdir(theme_source_path):
                     os.symlink(os.path.abspath(os.path.join(theme_source_path, theme)), os.path.join(theme_path, theme))
-
-                subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
+                
+                self._bundle_install(instance_path)
+                #subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
                 subprocess.call(['rake', 'db:migrate'], cwd=instance_path, env=os.environ)
 
                 subprocess.call(['rake', 'redmine:plugins'], cwd=instance_path, env=os.environ)
@@ -353,3 +366,39 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         #    pass
         #else:
         #    self.install()
+
+    def _install_gems(self, gems=[], working_dir='.'):
+        if gems:
+
+            self.logger.info('Install Ruby Gems: {gems}'.format(gems=' '.join(gems)))
+            if os.environ['https_proxy']:
+                subprocess.call(['gem', 'install', '--http-proxy='+os.environ['https_proxy'], '--source=https://rubygems.org/']+gems, cwd=working_dir, env=os.environ)
+                #system('{path}/gem install --http-proxy={proxy} --source={source} {gems} '.format(path=bin_dir,gems=' '.join(gems),proxy=os.environ['https_proxy'],source='https://rubygems.org/'))
+            elif os.environ['http_proxy']:
+                subprocess.call(['gem', 'install', '--http-proxy='+os.environ['http_proxy'], '--source=http://rubygems.org/']+gems, cwd=working_dir, env=os.environ)
+            else:
+                subprocess.call(['gem', 'install']+gems, cwd=working_dir, env=os.environ)
+    def _bundle_install(self, working_dir='.'):
+        #if os.environ['https_proxy']:
+        #    subprocess.call(['bundle', 'install', '--http-proxy='+os.environ['https_proxy'], '--without']+self.options['without'].split(), cwd=working_dir, env=os.environ)
+        #    #system('{path}/gem install --http-proxy={proxy} --source={source} {gems} '.format(path=bin_dir,gems=' '.join(gems),proxy=os.environ['https_proxy'],source='https://rubygems.org/'))
+        #elif os.environ['http_proxy']:
+        #    subprocess.call(['bundle', 'install', '--http-proxy='+os.environ['http_proxy'], '--without']+self.options['without'].split(), cwd=working_dir, env=os.environ)
+        #else:
+        if os.environ['http_proxy'] and os.environ['https_proxy'] and (os.environ['http_proxy'] != os.environ['https_proxy']):
+            self._modify_gemfiles(working_dir)
+        subprocess.call(['which' ,'bundle'], cwd=working_dir, env=os.environ)
+        subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=working_dir, env=os.environ)
+
+    def _modify_gemfiles(self, working_dir):
+        gemfiles = [os.path.join(working_dir, 'Gemfile')]
+        for plugin in os.listdir(os.path.join(working_dir, 'plugins')):
+            gemfiles.append(os.path.join(working_dir, 'plugins', plugin, 'Gemfile'))
+
+        self.logger.info('Change Gemfiles: {gemfiles}'.format(gemfiles=' '.join(gemfiles)))
+        for gemfile in gemfiles:
+            if os.path.exists(gemfile):
+                for line in fileinput.input(gemfile, inplace=True):
+                    print(line.replace("source 'https://rubygems.org'", "source 'http://rubygems.org'"), end='')
+
+
