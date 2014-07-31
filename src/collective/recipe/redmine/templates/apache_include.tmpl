@@ -4,34 +4,34 @@ PassengerRuby ${options.ruby}
 
 {% if options.mc %}
 {% for instance in options.instances %}
-	Alias ${instance.suburi} ${instance.location}/public
-	<Location "${instance.suburi}" >
-	    PassengerBaseURI ${instance.suburi}
-	    PassengerAppRoot ${instance.location}
-	    SetEnv GEM_HOME  ${instance.gem_home} 
-	    SetEnv GEM_PATH  ${instance.gem_path}
-	</Location>
-	<Directory "${instance.location}/public" >
-	    Order allow,deny
-	    Allow from all
-	    Options -MultiViews
-	    # This relaxes Apache security settings.
-	    AllowOverride all
-	    # Uncomment this if you're on Apache >= 2.4:
-	    Require all granted
-	</Directory>
+    Alias ${instance.suburi} ${instance.location}/public
+    <Location "${instance.suburi}" >
+        PassengerBaseURI ${instance.suburi}
+        PassengerAppRoot ${instance.location}
+        SetEnv GEM_HOME  ${instance.gem_home} 
+        SetEnv GEM_PATH  ${instance.gem_path}
+    </Location>
+    <Directory "${instance.location}/public" >
+        Order allow,deny
+        Allow from all
+        Options -MultiViews +FollowSymLinks
+        # This relaxes Apache security settings.
+        AllowOverride all
+        # Uncomment this if you're on Apache >= 2.4:
+        {% if not options.apache_version_gt2_4 %}#{% end %}Require all granted
+    </Directory>
 
 {% end %}
 {% if not options.mc %}
-	DocumentRoot ${}/public
-	<Directory /srv/www/redmine-2.4/public>
-	    Order allow,deny
-	    Allow from all
-	    # This relaxes Apache security settings.
-	    AllowOverride all
-	    # MultiViews must be turned off.
-	    Options -MultiViews
-	    # Uncomment this if you're on Apache >= 2.4:
-	    Require all granted
-	</Directory>
+    DocumentRoot ${}/public
+    <Directory /srv/www/redmine-2.4/public>
+        Order allow,deny
+        Allow from all
+        # This relaxes Apache security settings.
+        AllowOverride all
+        # MultiViews must be turned off.
+        Options -MultiViews +FollowSymLinks
+        # Uncomment this if you're on Apache >= 2.4:
+        {% if not options.apache_version_gt2_4 %}#{% end %}Require all granted
+    </Directory>
 {% end %}

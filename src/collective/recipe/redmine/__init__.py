@@ -10,6 +10,8 @@ from datetime import datetime
 from zc.buildout.easy_install import scripts as create_script
 from zc.buildout import UserError
 
+from distutils.version import LooseVersion
+
 import glob
 import logging
 import os
@@ -91,8 +93,15 @@ class _RedmineBaseRecipe(object):
 
 
     def generate_apache_file(self, source, destination, **kwargs):
+        gt2_4 = False
+        sub = subprocess.check_output(['apache2ctl','-v'])
+        lines = sub.splitlines()
+        for line in lines:
+            if line.startswith('Server version: Apache/'):
+                version = line.replace('Server version: Apache/','')
+                gt2_4 = LooseVersion(version) >= LooseVersion('2.4.0')
         self._generate_from_template(source=source, destination=destination,
-                                     name='redmine_include.conf', **kwargs)
+                                     name='redmine_include.conf', apache_version_gt2_4=gt2_4, **kwargs)
     def generate_index_file(self, source, destination, **kwargs):
         self._generate_from_template(source=source, destination=destination,
                                      name='index.html', **kwargs)
@@ -306,10 +315,12 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                 theme_path = os.path.join(instance_path, 'public', 'themes')
 
                 for plugin in os.listdir(plugin_source_path):
-                    os.symlink(os.path.abspath(os.path.join(plugin_source_path, plugin)), os.path.join(plugin_path, plugin))
+                    #os.symlink(os.path.abspath(os.path.join(plugin_source_path, plugin)), os.path.join(plugin_path, plugin))
+                    shutil.copytree(os.path.abspath(os.path.join(plugin_source_path, plugin)), os.path.join(plugin_path, plugin))
 
                 for theme in os.listdir(theme_source_path):
-                    os.symlink(os.path.abspath(os.path.join(theme_source_path, theme)), os.path.join(theme_path, theme))
+                    #os.symlink(os.path.abspath(os.path.join(theme_source_path, theme)), os.path.join(theme_path, theme))
+                    shutil.copytree(os.path.abspath(os.path.join(theme_source_path, theme)), os.path.join(theme_path, theme))
                 
                 self._bundle_install(instance_path)
                 #subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=instance_path, env=os.environ)
@@ -369,12 +380,11 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
     def _install_gems(self, gems=[], working_dir='.'):
         if gems:
-
             self.logger.info('Install Ruby Gems: {gems}'.format(gems=' '.join(gems)))
-            if os.environ['https_proxy']:
+            if os.environ.get('https_proxy'):
                 subprocess.call(['gem', 'install', '--http-proxy='+os.environ['https_proxy'], '--source=https://rubygems.org/']+gems, cwd=working_dir, env=os.environ)
                 #system('{path}/gem install --http-proxy={proxy} --source={source} {gems} '.format(path=bin_dir,gems=' '.join(gems),proxy=os.environ['https_proxy'],source='https://rubygems.org/'))
-            elif os.environ['http_proxy']:
+            elif os.environ.get('http_proxy'):
                 subprocess.call(['gem', 'install', '--http-proxy='+os.environ['http_proxy'], '--source=http://rubygems.org/']+gems, cwd=working_dir, env=os.environ)
             else:
                 subprocess.call(['gem', 'install']+gems, cwd=working_dir, env=os.environ)
@@ -385,7 +395,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         #elif os.environ['http_proxy']:
         #    subprocess.call(['bundle', 'install', '--http-proxy='+os.environ['http_proxy'], '--without']+self.options['without'].split(), cwd=working_dir, env=os.environ)
         #else:
-        if os.environ['http_proxy'] and os.environ['https_proxy'] and (os.environ['http_proxy'] != os.environ['https_proxy']):
+        if os.environ.get('http_proxy') and os.environ.get('https_proxy') and (os.environ.get('http_proxy') != os.environ.get('https_proxy')):
             self._modify_gemfiles(working_dir)
         subprocess.call(['which' ,'bundle'], cwd=working_dir, env=os.environ)
         subprocess.call(['bundle', 'install', '--without']+self.options['without'].split(), cwd=working_dir, env=os.environ)
