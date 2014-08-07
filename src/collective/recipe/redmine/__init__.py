@@ -95,15 +95,15 @@ class _RedmineBaseRecipe(object):
     def generate_apache_file(self, source, destination, **kwargs):
         gt2_4 = False
         try: 
-        sub = subprocess.check_output(['apache2ctl','-v'])
-        lines = sub.splitlines()
-        for line in lines:
-            if line.startswith('Server version: Apache/'):
-                version = line.replace('Server version: Apache/','')
-                gt2_4 = LooseVersion(version) >= LooseVersion('2.4.0')
+            sub = subprocess.check_output(['apache2ctl','-v'])
+            lines = sub.splitlines()
+            for line in lines:
+                if line.startswith('Server version: Apache/'):
+                    version = line.replace('Server version: Apache/','')
+                    gt2_4 = LooseVersion(version) >= LooseVersion('2.4.0')
         except AttributeError:
-            print "no Version Check for Apache possible"
-            pass
+            print("no Version Check for Apache possible")
+            
         self._generate_from_template(source=source, destination=destination,
                                      name='redmine_include.conf', apache_version_gt2_4=gt2_4, **kwargs)
     def generate_index_file(self, source, destination, **kwargs):
