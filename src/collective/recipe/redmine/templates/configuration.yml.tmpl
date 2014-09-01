@@ -91,7 +91,7 @@ default:
   # same secret token on each machine.
   #secret_token: 'change it to a long random string'
 {% if options.config['use_secret_token'] %}\
-  secret_token = options.config['secret_token']
+  secret_token = ${options.config['secret_token']}
 {% end %}\
 
   # Absolute path (e.g. /usr/bin/convert, c:/im/convert.exe) to
