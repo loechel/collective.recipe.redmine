@@ -106,12 +106,15 @@ class _RedmineBaseRecipe(object):
             
         self._generate_from_template(source=source, destination=destination,
                                      name='redmine_include.conf', apache_version_gt2_4=gt2_4, **kwargs)
-    def generate_index_file(self, source, destination, **kwargs):
+    def generate_index_file(self, source, destination, name='index.html', **kwargs):
         self._generate_from_template(source=source, destination=destination,
-                                     name='index.html', **kwargs)
+                                     name=name, **kwargs)
     def generate_database_file(self, source, destination, **kwargs):
         self._generate_from_template(source=source, destination=destination,
                                      name='database.yml', **kwargs)
+    def generate_configuration_file(self, source, destination, **kwargs):
+        self._generate_from_template(source=source, destination=destination,
+                                     name='configuration.yml', **kwargs)
 
 class SingleCoreRecipe(_RedmineBaseRecipe):
 
@@ -145,6 +148,7 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
     def install(self):
         logger = logging.getLogger(self.name)
+        logger.info('Install Redmine (MultiCore Setup)')
         if os.path.exists(self.options['location']):
             subprocess.call(['rm', '-rf', self.options['location']])
 
@@ -180,8 +184,9 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         buildout_var_path=os.path.join(self.buildout['buildout']['directory'], 'var')
 
         instance_list = []
-
+        logger.info('Install Redmine Instances')
         for instance in self.options['instances'].split():
+            logger.info('Install Redmine Instance: "' + instance+'"')
             if instance:
                 instance_path = os.path.join(self.buildout['buildout']['parts-directory'], 'redmine-'+instance)
                 buildout_var_path=self.buildout['buildout']['directory']+'/var'
@@ -310,6 +315,20 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                     subprocess.call(['rake', 'generate_secret_token'], cwd=instance_path, env=os.environ)
                     subprocess.call(['rake', 'db:migrate'], cwd=instance_path, env=os.environ)
 
+                # Build config/configuration.yml
+                config = {}
+
+                if self.buildout[instance].get('secret_token'):
+                    config['use_secret_token'] = True
+                    config['secret_token'] = self.buildout[instance].get('secret_token')
+                else:
+                    config['use_secret_token'] = False
+
+                self.generate_configuration_file(            
+                    source=('%s/configuration.yml.tmpl' % TEMPLATE_DIR),                    
+                    destination=os.path.join(instance_path, 'config'),
+                    config = config,
+                    )
 
                 # install Themes and Plugins by linking
                 plugin_source_path = os.path.abspath(self.buildout[instance].get('plugins'))
@@ -342,13 +361,15 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
 
 
                 ainstance = {}
-                ainstance['suburi'] = self.buildout[instance].get('redmine_suburi', '/'+instance)
+                ainstance['suburi'] = self.buildout[instance].get('sub_uri', '/'+instance)
                 ainstance['location'] = instance_path
                 ainstance['gem_home'] = os.environ['GEM_HOME']
                 ainstance['gem_path'] = os.environ['GEM_PATH']
                 instance_list.append(ainstance)
 
+                logger.info('Installation completed (Instance: "' + instance + '"")')
 
+        logger.info("Installation of instances completed, generate Meta-Files")
         passenger_ruby = self.options['ruby']+'/ruby'
 
         self.generate_apache_file(            
@@ -363,7 +384,14 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
                     destination=os.path.abspath(self.buildout['buildout']['directory']),
                     instances = instance_list,
                     )
+        self.generate_index_file(            
+                    source=('%s/index.html.incl.tmpl' % TEMPLATE_DIR),
+                    destination=os.path.abspath(self.buildout['buildout']['directory']),
+                    name='index.html.incl',
+                    instances = instance_list,
+                    )
 
+        logger.info('Installation of Redmine completed.')
         return self.options['location'] 
 
 
