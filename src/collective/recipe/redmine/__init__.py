@@ -4,22 +4,22 @@ from __future__ import print_function
 import fileinput
 import logging
 import os
+import pkg_resources
 import shutil
 import subprocess
 import sys
-from distutils.version import LooseVersion
-
-import pkg_resources
 import zc.buildout
+
+
 from datetime import datetime
+from distutils.version import LooseVersion
 from genshi.template import Context, NewTextTemplate
 from genshi.template.base import TemplateSyntaxError
 from genshi.template.eval import UndefinedError
 from zc.buildout import UserError
+#from zc.buildout.easy_install import scripts as create_script
 
 import ipdb
-
-#from zc.buildout.easy_install import scripts as create_script
 
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
@@ -32,26 +32,26 @@ def system(c):
 
 class _RedmineBaseRecipe(object):
 
-    def __init__(self, buildout, name, options_orig):
+    def __init__(self, buildout, name, options):
 
-        self.buildout, self.name, self.options = buildout, name, options_orig
+        self.buildout, self.name, self.options = buildout, name, options
         self.logger = logging.getLogger(self.name)
 
-        self.options['redmine_version'] = options_orig.get(
+        self.options['redmine_version'] = options.get(
             'redmine_version',
             '2.5-stable').strip()
-        self.options['virtual-ruby'] = options_orig.get(
+        self.options['virtual-ruby'] = options.get(
             'virtual-ruby',
             False)
-        self.options['rails_env'] = options_orig.get(
+        self.options['rails_env'] = options.get(
             'rails_env',
             'production').strip()
-        self.options['without'] = options_orig.get(
+        self.options['without'] = options.get(
             'build_without',
             'development test').strip()
-        self.options['ruby'] = options_orig.get('ruby', '').strip()
+        self.options['ruby'] = options.get('ruby', '').strip()
 
-        location = options_orig.get(
+        location = options.get(
             'location', buildout['buildout']['parts-directory'])
         self.options['location'] = os.path.join(location, name)
 
@@ -174,11 +174,19 @@ class MultiCoreRecipe(_RedmineBaseRecipe):
         super(MultiCoreRecipe, self).__init__(buildout, name, options)
 
     def install(self):
+        """Install multiple Redmine Instances."""
+
+        # get Logger for modul
         logger = logging.getLogger(self.name)
         logger.info('Install Redmine (MultiCore Setup)')
+
+        # check if location already exists, if so it is an update and should
+        # be handeld from scratch, delete location and rebuild.
         if os.path.exists(self.options['location']):
             subprocess.call(['rm', '-rf', self.options['location']])
 
+        # Create base directory for multicore instance which works as
+        # copy-location
         subprocess.call(['mkdir', '-p', self.options['location']])
 
         if self.options['virtual-ruby']:
